@@ -244,7 +244,7 @@ sink_setcaps (GstPad *pad,
     GstOmxBaseFilter *omx_base;
     GstOmxJpegEnc *self;
     GOmxCore *gomx;
-    OMX_COLOR_FORMATTYPE color_format = OMX_COLOR_FormatYUV420Planar;
+    OMX_COLOR_FORMATTYPE color_format = OMX_COLOR_FormatYUV420PackedPlanar;
     gint width = 0;
     gint height = 0;
 
@@ -278,7 +278,7 @@ sink_setcaps (GstPad *pad,
             switch (fourcc)
             {
                 case GST_MAKE_FOURCC ('I', '4', '2', '0'):
-                    color_format = OMX_COLOR_FormatYUV420Planar;
+                    color_format = OMX_COLOR_FormatYUV420PackedPlanar;
                     break;
                 case GST_MAKE_FOURCC ('U', 'Y', 'V', 'Y'):
                     color_format = OMX_COLOR_FormatCbYCrY;
@@ -365,7 +365,7 @@ omx_setup (GstOmxBaseFilter *omx_base)
                             param.nBufferSize = 400;
 #endif
                         break;
-                    case OMX_COLOR_FormatYUV420Planar:
+                    case OMX_COLOR_FormatYUV420PackedPlanar:
                         param.nBufferSize = (GST_ROUND_UP_16 (width) * GST_ROUND_UP_16 (height)) * 3 / 2;
 #if 0
                         if (param.nBufferSize >= 1600)

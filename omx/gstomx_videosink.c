@@ -150,7 +150,7 @@ setcaps (GstBaseSink *gst_sink,
                 switch (fourcc)
                 {
                     case GST_MAKE_FOURCC ('I', '4', '2', '0'):
-                        color_format = OMX_COLOR_FormatYUV420Planar;
+                        color_format = OMX_COLOR_FormatYUV420PackedPlanar;
                         break;
                     case GST_MAKE_FOURCC ('Y', 'U', 'Y', '2'):
                         color_format = OMX_COLOR_FormatYCbYCr;
@@ -175,7 +175,7 @@ setcaps (GstBaseSink *gst_sink,
 
             switch (color_format)
             {
-                case OMX_COLOR_FormatYUV420Planar:
+                case OMX_COLOR_FormatYUV420PackedPlanar:
                     param.nBufferSize = (width * height * 1.5);
                     break;
                 case OMX_COLOR_FormatYCbYCr:
