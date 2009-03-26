@@ -27,11 +27,7 @@
 GST_DEBUG_CATEGORY_EXTERN(gstomx_debug);
 #define GST_OMX_CAT gstomx_debug
 
-#ifdef BUILD_WITH_ANDROID
 #define OMX_COMPONENT_NAME "OMX.PV.aacdec"
-#else
-#define OMX_COMPONENT_NAME "OMX.st.audio_decoder.aac"
-#endif
 
 static GstOmxBaseFilterClass *parent_class = NULL;
 
@@ -253,12 +249,8 @@ omx_setup (GstOmxBaseFilter *omx_base)
         param->nPortIndex = 0;
         OMX_GetParameter (gomx->omx_handle, OMX_IndexParamAudioAac, param);
 
-#ifdef BUILD_WITH_ANDROID
         /* FIXME: it's a trick to meet android's open core requirement */
         param->eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4FF;
-#else
-        param->eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4ADTS;
-#endif
 
         OMX_SetParameter (gomx->omx_handle, OMX_IndexParamAudioAac, param);
 
@@ -278,7 +270,6 @@ static GstFlowReturn pad_chain (GstPad *pad,
 
     GST_INFO_OBJECT (omx_aacdec, "Enter");
 
-#ifdef BUILD_WITH_ANDROID
     /* put codec_data before the first frame to work with PV OpenMax in android */
     if (omx_aacdec->codec_data && buf)
     {
@@ -315,7 +306,6 @@ static GstFlowReturn pad_chain (GstPad *pad,
 
         buf = newbuf;
     }
-#endif /* BUILD_WITH_ANDROID */
 
     if (omx_aacdec->base_chain_func)
         result = omx_aacdec->base_chain_func (pad, buf);
