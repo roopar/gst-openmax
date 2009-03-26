@@ -314,12 +314,14 @@ output_loop (gpointer data)
 
                 caps = gst_pad_get_negotiated_caps (self->srcpad);
 
-                if (!caps)
+                if (!caps || gomx->settings_changed )
                 {
                     /** @todo We shouldn't be doing this. */
                     GST_WARNING_OBJECT (self, "faking settings changed notification");
                     if (gomx->settings_changed_cb)
                         gomx->settings_changed_cb (gomx);
+                    gomx->settings_changed = FALSE;
+                    GST_LOG_OBJECT (self, "Reset setting of source pad");
                 }
                 else
                 {
@@ -489,7 +491,9 @@ pad_chain (GstPad *pad,
 
         setup_ports (self);
 
+        GST_LOG_OBJECT (self, "Before g_omx_core_prepare()");
         g_omx_core_prepare (self->gomx);
+        GST_LOG_OBJECT (self, "After g_omx_core_prepare()");
 
         self->initialized = TRUE;
         gst_pad_start_task (self->srcpad, output_loop, self->srcpad);
@@ -521,7 +525,7 @@ pad_chain (GstPad *pad,
                 goto out_flushing;
             }
 
-            GST_LOG_OBJECT (self, "request buffer");
+            GST_LOG_OBJECT (self, "request buffer, in_port=0x%08x", in_port);
             omx_buffer = g_omx_port_request_buffer (in_port);
 
             GST_LOG_OBJECT (self, "omx_buffer: %p", omx_buffer);
@@ -566,9 +570,13 @@ pad_chain (GstPad *pad,
                     omx_buffer->nTimeStamp = gst_util_uint64_scale_int (GST_BUFFER_TIMESTAMP (buf),
                                                                         OMX_TICKS_PER_SECOND,
                                                                         GST_SECOND);
+                                                                        
+                    GST_LOG_OBJECT (self, "omx_buffer->nTimeStamp=%" G_GINT64_FORMAT ", buf_time=%d", omx_buffer->nTimeStamp, GST_BUFFER_TIMESTAMP (buf));                                                                        
                 }
 
                 buffer_offset += omx_buffer->nFilledLen;
+                /* set end of frame to work with PV OpenMAX in Android */
+                omx_buffer->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
                 GST_LOG_OBJECT (self, "release_buffer");
                 /** @todo untaint buffer */
@@ -776,7 +784,7 @@ type_instance_init (GTypeInstance *instance,
     gst_element_add_pad (GST_ELEMENT (self), self->srcpad);
 
     self->omx_library = g_strdup (DEFAULT_LIBRARY_NAME);
-
+    
     GST_LOG_OBJECT (self, "end");
 }
 

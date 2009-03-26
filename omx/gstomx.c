@@ -24,18 +24,35 @@
 #include "gstomx_mpeg4dec.h"
 #include "gstomx_h263dec.h"
 #include "gstomx_h264dec.h"
+
+#ifndef BUILD_WITH_ANDROID
 #include "gstomx_wmvdec.h"
 #include "gstomx_mpeg4enc.h"
 #include "gstomx_avcenc.h"
 #include "gstomx_h263enc.h"
 #include "gstomx_vorbisdec.h"
+#endif /* BUILD_WITH_ANDROID */
+
 #include "gstomx_mp3dec.h"
 #include "gstomx_aacdec.h"
+
+#ifndef BUILD_WITH_ANDROID
 #include "gstomx_aacenc.h"
+#endif /* BUILD_WITH_ANDROID */
+
 #include "gstomx_amrnbdec.h"
+
+#ifndef BUILD_WITH_ANDROID
 #include "gstomx_amrnbenc.h"
+#endif /* BUILD_WITH_ANDROID */
+
 #include "gstomx_amrwbdec.h"
+
+#ifndef BUILD_WITH_ANDROID
 #include "gstomx_amrwbenc.h"
+#endif /* BUILD_WITH_ANDROID */
+
+#ifndef BUILD_WITH_ANDROID
 #include "gstomx_adpcmdec.h"
 #include "gstomx_adpcmenc.h"
 #include "gstomx_g711dec.h"
@@ -47,6 +64,7 @@
 #include "gstomx_audiosink.h"
 #include "gstomx_videosink.h"
 #include "gstomx_filereadersrc.h"
+#endif /* BUILD_WITH_ANDROID */
 
 #include "config.h"
 
@@ -83,6 +101,7 @@ plugin_init (GstPlugin *plugin)
         return false;
     }
 
+#ifndef BUILD_WITH_ANDROID
     if (!gst_element_register (plugin, "omx_wmvdec", DEFAULT_RANK, GST_OMX_WMVDEC_TYPE))
     {
         return false;
@@ -107,6 +126,7 @@ plugin_init (GstPlugin *plugin)
     {
         return false;
     }
+#endif /* BUILD_WITH_ANDROID */
 
     if (!gst_element_register (plugin, "omx_mp3dec", DEFAULT_RANK, GST_OMX_MP3DEC_TYPE))
     {
@@ -118,26 +138,30 @@ plugin_init (GstPlugin *plugin)
         return false;
     }
 
+#ifndef BUILD_WITH_ANDROID
     if (!gst_element_register (plugin, "omx_amrnbenc", DEFAULT_RANK, GST_OMX_AMRNBENC_TYPE))
     {
         return false;
     }
+#endif /* BUILD_WITH_ANDROID */
 
     if (!gst_element_register (plugin, "omx_amrwbdec", DEFAULT_RANK, GST_OMX_AMRWBDEC_TYPE))
     {
         return false;
     }
 
+#ifndef BUILD_WITH_ANDROID
     if (!gst_element_register (plugin, "omx_amrwbenc", DEFAULT_RANK, GST_OMX_AMRWBENC_TYPE))
     {
         return false;
     }
+#endif /* BUILD_WITH_ANDROID */
 
     if (!gst_element_register (plugin, "omx_aacdec", DEFAULT_RANK, GST_OMX_AACDEC_TYPE))
     {
         return false;
     }
-
+#ifndef BUILD_WITH_ANDROID
     if (!gst_element_register (plugin, "omx_aacenc", DEFAULT_RANK, GST_OMX_AACENC_TYPE))
     {
         return false;
@@ -197,7 +221,7 @@ plugin_init (GstPlugin *plugin)
     {
         return false;
     }
-
+#endif /* BUILD_WITH_ANDROID */
     return true;
 }
 

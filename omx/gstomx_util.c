@@ -21,7 +21,12 @@
  */
 
 #include "gstomx_util.h"
+#include <gst/gst.h>
 #include <dlfcn.h>
+
+/* open omx debug category */
+GST_DEBUG_CATEGORY_EXTERN(gstomx_debug);
+#define GST_OMX_CAT gstomx_debug
 
 /*
  * Forward declarations
@@ -114,20 +119,42 @@ imp_new (const gchar *name)
     {
         void *handle;
 
-        imp->dl_handle = handle = dlopen (name, RTLD_LAZY);
+        imp->dl_handle = handle = dlopen (name, RTLD_LAZY); 
         if (!handle)
         {
-            g_warning ("%s\n", dlerror ());
+            GST_CAT_ERROR(GST_OMX_CAT, "dlopen(%d) is failed: %s", name, dlerror());
             imp_free (imp);
             return NULL;
         }
 
+#ifdef BUILD_WITH_ANDROID
+        imp->sym_table.init = dlsym (handle, "PV_MasterOMX_Init");
+        imp->sym_table.deinit = dlsym (handle, "PV_MasterOMX_Deinit");
+        imp->sym_table.get_handle = dlsym (handle, "PV_MasterOMX_GetHandle");
+        imp->sym_table.free_handle = dlsym (handle, "PV_MasterOMX_FreeHandle");
+#else
         imp->sym_table.init = dlsym (handle, "OMX_Init");
         imp->sym_table.deinit = dlsym (handle, "OMX_Deinit");
         imp->sym_table.get_handle = dlsym (handle, "OMX_GetHandle");
         imp->sym_table.free_handle = dlsym (handle, "OMX_FreeHandle");
-    }
+#endif
+        GST_CAT_LOG(GST_OMX_CAT,"init=%08x, deinit=%08x, get_handle=%08x, free_handle=%08x",
+             imp->sym_table.init,
+             imp->sym_table.deinit,
+             imp->sym_table.get_handle,
+             imp->sym_table.free_handle);
 
+        if(!imp->sym_table.init ||
+            !imp->sym_table.deinit ||
+            !imp->sym_table.get_handle ||
+            !imp->sym_table.free_handle)
+        {
+            GST_CAT_ERROR(GST_OMX_CAT, "dlsym() is failed: %s", dlerror());
+            imp_free (imp);
+            return NULL;
+        }
+    }
+    
     return imp;
 }
 
@@ -170,7 +197,10 @@ release_imp (GOmxImp *imp)
     imp->client_count--;
     if (imp->client_count == 0)
     {
-        imp->sym_table.deinit ();
+        if (imp->sym_table.deinit != NULL)
+        {
+            imp->sym_table.deinit ();
+        }
     }
 }
 
@@ -212,6 +242,8 @@ g_omx_core_new (void)
     core->flush_sem = g_omx_sem_new ();
 
     core->omx_state = OMX_StateInvalid;
+    
+    core->settings_changed = FALSE;
 
     return core;
 }
@@ -233,16 +265,19 @@ g_omx_core_init (GOmxCore *core,
                  const gchar *library_name,
                  const gchar *component_name)
 {
+    GST_CAT_LOG(GST_OMX_CAT, "Enter, library_name=%s, component_name=%s", library_name, component_name);
     core->imp = request_imp (library_name);
 
     if (!core->imp)
     {
         core->omx_error = OMX_ErrorUndefined;
+        GST_CAT_ERROR(GST_OMX_CAT, "Leave, OMX_ErrorUndefined");
         return;
     }
 
     core->omx_error = core->imp->sym_table.get_handle (&core->omx_handle, (gchar *) component_name, core, &callbacks);
     core->omx_state = OMX_StateLoaded;
+    GST_CAT_LOG(GST_OMX_CAT, "Leave, omx_error=%d, omx_handle=0x%08x", core->omx_error, core->omx_handle);
 }
 
 void
@@ -263,6 +298,8 @@ g_omx_core_deinit (GOmxCore *core)
 void
 g_omx_core_prepare (GOmxCore *core)
 {
+    GST_CAT_LOG(GST_OMX_CAT, "Enter");
+
     change_state (core, OMX_StateIdle);
 
     /* Allocate buffers. */
@@ -275,6 +312,7 @@ g_omx_core_prepare (GOmxCore *core)
             GOmxPort *port;
 
             port = g_omx_core_get_port (core, index);
+            GST_CAT_LOG(GST_OMX_CAT, "port=0x%08x", port);
 
             if (port)
             {
@@ -282,22 +320,26 @@ g_omx_core_prepare (GOmxCore *core)
                 {
                     gpointer buffer_data;
                     guint size;
+                    OMX_ERRORTYPE err;
 
                     size = port->buffer_size;
                     buffer_data = g_malloc (size);
 
-                    OMX_UseBuffer (core->omx_handle,
+                    err = OMX_UseBuffer (core->omx_handle,
                                    &port->buffers[i],
                                    index,
                                    NULL,
                                    size,
                                    buffer_data);
+                    GST_CAT_LOG(GST_OMX_CAT, "  OMX_UseBuffer, buffer_size=%d, err=0x%08x", size, err);
                 }
             }
         }
     }
 
+    GST_CAT_LOG(GST_OMX_CAT, "Before wait_for_state()");
     wait_for_state (core, OMX_StateIdle);
+    GST_CAT_LOG(GST_OMX_CAT, "Leave");
 }
 
 void
@@ -390,6 +432,14 @@ g_omx_core_setup_port (GOmxCore *core,
     GOmxPort *port;
     guint index;
 
+    GST_CAT_LOG(GST_OMX_CAT, 
+        "Enter, nPortIndex=%d, nBufferCountActual=%d, nBufferCountMin=%d, nBufferSize=%d, eDomain=%d",
+        omx_port->nPortIndex,
+        omx_port->nBufferCountActual,
+        omx_port->nBufferCountMin,
+        omx_port->nBufferSize,
+        omx_port->eDomain);
+
     index = omx_port->nPortIndex;
     port = g_omx_core_get_port (core, index);
 
@@ -480,7 +530,12 @@ g_omx_port_setup (GOmxPort *port,
     }
 
     port->type = type;
+#ifdef BUILD_WITH_ANDROID
+    /* PV OMX require actual buffer */
+    port->num_buffers = omx_port->nBufferCountActual;
+#else
     port->num_buffers = omx_port->nBufferCountMin;
+#endif
     port->buffer_size = omx_port->nBufferSize;
 
     if (port->buffers)
@@ -685,6 +740,8 @@ EventHandler (OMX_HANDLETYPE omx_handle,
 
     core = (GOmxCore *) app_data;
 
+    GST_CAT_LOG(GST_OMX_CAT,"Enter, eEvent=0x%08x", eEvent);
+
     switch (eEvent)
     {
         case OMX_EventCmdComplete:
@@ -693,13 +750,17 @@ EventHandler (OMX_HANDLETYPE omx_handle,
 
                 cmd = (OMX_COMMANDTYPE) nData1;
 
+                GST_CAT_LOG(GST_OMX_CAT,"OMX_EventCmdComplete enter");
+
                 switch (cmd)
                 {
                     case OMX_CommandStateSet:
                         core->omx_state = (OMX_STATETYPE) nData2;
+                        GST_CAT_LOG(GST_OMX_CAT,"OMX_EventCmdComplete, OMX_CommandStateSet, omx_state=%d", core->omx_state);
                         g_omx_sem_up (core->state_sem);
                         break;
                     case OMX_CommandFlush:
+                        GST_CAT_LOG(GST_OMX_CAT,"OMX_EventCmdComplete, OMX_CommandFlush");
                         g_omx_sem_up (core->flush_sem);
                         break;
                     default:
@@ -720,14 +781,24 @@ EventHandler (OMX_HANDLETYPE omx_handle,
         case OMX_EventPortSettingsChanged:
             {
                 /** @todo only on the relevant port. */
+#ifdef BUILD_WITH_ANDROID
+                /*  
+                 *  In Android PV OpenMAX, we cannot call GetParameter() in call back function.
+                 *  Set a flag to call it in stream thread
+                 */
+                core->settings_changed = TRUE;
+#else                
                 if (core->settings_changed_cb)
                 {
                     core->settings_changed_cb (core);
                 }
+#endif /* BUILD_WITH_ANDROID */             
             }
         default:
             break;
     }
+
+    GST_CAT_LOG(GST_OMX_CAT,"Leave");
 
     return OMX_ErrorNone;
 }
@@ -740,10 +811,14 @@ EmptyBufferDone (OMX_HANDLETYPE omx_handle,
     GOmxCore *core;
     GOmxPort *port;
 
+    GST_CAT_LOG(GST_OMX_CAT,"Enter");
+
     core = (GOmxCore*) app_data;
     port = g_omx_core_get_port (core, omx_buffer->nInputPortIndex);
 
     got_buffer (core, port, omx_buffer);
+
+    GST_CAT_LOG(GST_OMX_CAT,"Leave");
 
     return OMX_ErrorNone;
 }
@@ -755,11 +830,14 @@ FillBufferDone (OMX_HANDLETYPE omx_handle,
 {
     GOmxCore *core;
     GOmxPort *port;
+    GST_CAT_LOG(GST_OMX_CAT,"Enter");
 
     core = (GOmxCore *) app_data;
     port = g_omx_core_get_port (core, omx_buffer->nOutputPortIndex);
 
     got_buffer (core, port, omx_buffer);
+
+    GST_CAT_LOG(GST_OMX_CAT,"Leave");
 
     return OMX_ErrorNone;
 }

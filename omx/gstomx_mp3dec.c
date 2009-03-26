@@ -23,7 +23,11 @@
 #include "gstomx_base_filter.h"
 #include "gstomx.h"
 
+#ifdef BUILD_WITH_ANDROID
+#define OMX_COMPONENT_NAME "OMX.PV.mp3dec"
+#else
 #define OMX_COMPONENT_NAME "OMX.st.audio_decoder.mp3.mad"
+#endif
 
 static GstOmxBaseFilterClass *parent_class = NULL;
 

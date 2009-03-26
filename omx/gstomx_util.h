@@ -29,6 +29,7 @@
 #include <OMX_Component.h>
 
 #include <async_queue.h>
+#include "config.h"
 
 /* Typedefs. */
 
@@ -85,6 +86,7 @@ struct GOmxCore
     GOmxSem *flush_sem;
 
     GOmxCb settings_changed_cb;
+    gboolean settings_changed;
     GOmxImp *imp;
 
     gboolean done;
