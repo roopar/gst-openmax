@@ -23,10 +23,6 @@
 #include "gstomx_base_filter.h"
 #include "gstomx.h"
 
-/* open omx debug category */
-GST_DEBUG_CATEGORY_EXTERN(gstomx_debug);
-#define GST_OMX_CAT gstomx_debug
-
 #define OMX_COMPONENT_NAME "OMX.PV.aacdec"
 
 static GstOmxBaseFilterClass *parent_class = NULL;
@@ -167,6 +163,7 @@ settings_changed_cb (GOmxCore *core)
 
         rate = param->nSamplingRate;
         channels = param->nChannels;
+
         free (param);
     }
 
