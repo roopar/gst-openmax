@@ -145,7 +145,7 @@ type_class_init (gpointer g_class,
     gobject_class = (GObjectClass *) g_class;
     gstelement_class = (GstElementClass *) g_class;
     parent_class = g_type_class_ref (GST_OMX_BASE_FILTER_TYPE);
-    gobject_class->dispose = gst_omx_aacdec_dispose; 
+    gobject_class->dispose = gst_omx_aacdec_dispose;
 }
 
 static void
@@ -206,11 +206,11 @@ sink_setcaps (GstPad *pad,
     GstOmxAacDec *omx_aacdec;
     const GValue *v = NULL;
 
-    omx_base = GST_OMX_BASE_FILTER (GST_PAD_PARENT (pad)); 
+    omx_base = GST_OMX_BASE_FILTER (GST_PAD_PARENT (pad));
     gomx = (GOmxCore *) omx_base->gomx;
     omx_aacdec = GST_OMX_AACDEC(gst_pad_get_parent (pad));
 
-    GST_INFO_OBJECT (omx_aacdec, "Enter"); 
+    GST_INFO_OBJECT (omx_aacdec, "Enter");
 
     /* get codec_data to work with PV OpenMax in Android */
     s = gst_caps_get_structure (caps, 0);
@@ -219,16 +219,16 @@ sink_setcaps (GstPad *pad,
         gst_buffer_unref(omx_aacdec->codec_data);
         omx_aacdec->codec_data = NULL;
     }
-    
+
     if ((v = gst_structure_get_value (s, "codec_data")))
     {
         omx_aacdec->codec_data = gst_buffer_ref (gst_value_get_buffer (v));
-        GST_INFO_OBJECT (omx_aacdec, 
+        GST_INFO_OBJECT (omx_aacdec,
             "codec_data_length=%d",
             GST_BUFFER_SIZE(omx_aacdec->codec_data));
     }
 
-    GST_INFO_OBJECT (omx_aacdec, "setcaps (sink): %" GST_PTR_FORMAT, caps); 
+    GST_INFO_OBJECT (omx_aacdec, "setcaps (sink): %" GST_PTR_FORMAT, caps);
 
     return gst_pad_set_caps (pad, caps);
 }
@@ -255,9 +255,9 @@ omx_setup (GstOmxBaseFilter *omx_base)
 #ifdef BUILD_WITH_ANDROID
         /* FIXME: it's a trick to meet android's open core requirement */
         param->eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4FF;
-#else        
+#else
         param->eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4ADTS;
-#endif        
+#endif
 
         OMX_SetParameter (gomx->omx_handle, OMX_IndexParamAudioAac, param);
 
@@ -275,37 +275,37 @@ static GstFlowReturn gst_omx_aacdec_pad_chain (GstPad *pad, GstBuffer *buf)
     omx_aacdec = GST_OMX_AACDEC(gst_pad_get_parent (pad));
 
     GST_INFO_OBJECT (omx_aacdec, "Enter");
-    
-#ifdef BUILD_WITH_ANDROID    
-    /* 
-     * put codec_data before the first frame to work with PV OpenMax in android 
+
+#ifdef BUILD_WITH_ANDROID
+    /*
+     * put codec_data before the first frame to work with PV OpenMax in android
      */
     if(omx_aacdec->codec_data != NULL && buf != NULL)
     {
         GstBuffer *newbuf = NULL;
-        int new_buf_size = 
+        int new_buf_size =
             GST_BUFFER_SIZE(buf) + GST_BUFFER_SIZE(omx_aacdec->codec_data);
 
-        GST_INFO_OBJECT (omx_aacdec, 
+        GST_INFO_OBJECT (omx_aacdec,
             "Put codec_data before the first frame, buf_size=%d, codec_data_size=%d",
             GST_BUFFER_SIZE(buf),
             GST_BUFFER_SIZE(omx_aacdec->codec_data));
 
         /* create a new buffer */
         newbuf = gst_buffer_new_and_alloc(new_buf_size);
-        
+
         /* copy meta data */
-        gst_buffer_copy_metadata(newbuf, buf, 
+        gst_buffer_copy_metadata(newbuf, buf,
             GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS | GST_BUFFER_COPY_CAPS);
-        
+
         /* copy codec data */
-        memcpy(GST_BUFFER_DATA(newbuf), 
+        memcpy(GST_BUFFER_DATA(newbuf),
             GST_BUFFER_DATA(omx_aacdec->codec_data), GST_BUFFER_SIZE(omx_aacdec->codec_data));
 
         /* copy the first frame */
         memcpy(
-            GST_BUFFER_DATA(newbuf)+GST_BUFFER_SIZE(omx_aacdec->codec_data), 
-            GST_BUFFER_DATA(buf), 
+            GST_BUFFER_DATA(newbuf)+GST_BUFFER_SIZE(omx_aacdec->codec_data),
+            GST_BUFFER_DATA(buf),
             GST_BUFFER_SIZE(buf));
 
         /* release buf and codec_data */
@@ -347,7 +347,7 @@ type_instance_init (GTypeInstance *instance,
     /* initialize aac decoder specific data */
     omx_aacdec->codec_data = NULL;
     omx_aacdec->base_chain_func = NULL;
-    
+
     /* replace base chain func */
     omx_aacdec->base_chain_func = GST_PAD_CHAINFUNC(omx_base->sinkpad);
     gst_pad_set_chain_function (omx_base->sinkpad, gst_omx_aacdec_pad_chain);
@@ -358,7 +358,7 @@ static void
 gst_omx_aacdec_dispose (GObject *obj)
 {
     GstOmxAacDec *omx_aacdec;
-    
+
     GST_INFO_OBJECT (omx_aacdec, "Enter");
 
     omx_aacdec = GST_OMX_AACDEC(obj);
