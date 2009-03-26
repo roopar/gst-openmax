@@ -27,7 +27,6 @@
 GST_DEBUG_CATEGORY_EXTERN(gstomx_debug);
 #define GST_OMX_CAT gstomx_debug
 
-
 #ifdef BUILD_WITH_ANDROID
 #define OMX_COMPONENT_NAME "OMX.PV.aacdec"
 #else
@@ -36,8 +35,8 @@ GST_DEBUG_CATEGORY_EXTERN(gstomx_debug);
 
 static GstOmxBaseFilterClass *parent_class = NULL;
 
-static GstFlowReturn gst_omx_aacdec_pad_chain (GstPad *pad, GstBuffer *buf);
-static void gst_omx_aacdec_dispose (GObject *obj);
+static GstFlowReturn pad_chain (GstPad *pad, GstBuffer *buf);
+static void dispose (GObject *obj);
 
 static GstCaps *
 generate_src_template (void)
@@ -145,7 +144,7 @@ type_class_init (gpointer g_class,
     gobject_class = (GObjectClass *) g_class;
     gstelement_class = (GstElementClass *) g_class;
     parent_class = g_type_class_ref (GST_OMX_BASE_FILTER_TYPE);
-    gobject_class->dispose = gst_omx_aacdec_dispose;
+    gobject_class->dispose = dispose;
 }
 
 static void
@@ -174,7 +173,8 @@ settings_changed_cb (GOmxCore *core)
         channels = param->nChannels;
         free (param);
     }
-    GST_DEBUG_OBJECT (omx_base, "After OMX_GetParameter, rate=%d, channels=%d", rate, channels);
+
+    GST_DEBUG_OBJECT (omx_base, "after OMX_GetParameter, rate=%d, channels=%d", rate, channels);
 
     {
         GstCaps *new_caps;
@@ -191,7 +191,8 @@ settings_changed_cb (GOmxCore *core)
         GST_INFO_OBJECT (omx_base, "caps are: %" GST_PTR_FORMAT, new_caps);
         gst_pad_set_caps (omx_base->srcpad, new_caps);
     }
-    GST_DEBUG_OBJECT (omx_base, "Leave");
+
+    GST_DEBUG_OBJECT (omx_base, "end");
 }
 
 static void omx_setup (GstOmxBaseFilter *omx_base);
@@ -208,15 +209,15 @@ sink_setcaps (GstPad *pad,
 
     omx_base = GST_OMX_BASE_FILTER (GST_PAD_PARENT (pad));
     gomx = (GOmxCore *) omx_base->gomx;
-    omx_aacdec = GST_OMX_AACDEC(gst_pad_get_parent (pad));
+    omx_aacdec = GST_OMX_AACDEC (gst_pad_get_parent (pad));
 
-    GST_INFO_OBJECT (omx_aacdec, "Enter");
+    GST_INFO_OBJECT (omx_aacdec, "begin");
 
     /* get codec_data to work with PV OpenMax in Android */
     s = gst_caps_get_structure (caps, 0);
-    if( omx_aacdec->codec_data != NULL )
+    if (omx_aacdec->codec_data)
     {
-        gst_buffer_unref(omx_aacdec->codec_data);
+        gst_buffer_unref (omx_aacdec->codec_data);
         omx_aacdec->codec_data = NULL;
     }
 
@@ -224,8 +225,8 @@ sink_setcaps (GstPad *pad,
     {
         omx_aacdec->codec_data = gst_buffer_ref (gst_value_get_buffer (v));
         GST_INFO_OBJECT (omx_aacdec,
-            "codec_data_length=%d",
-            GST_BUFFER_SIZE(omx_aacdec->codec_data));
+                         "codec_data_length=%d",
+                         GST_BUFFER_SIZE (omx_aacdec->codec_data));
     }
 
     GST_INFO_OBJECT (omx_aacdec, "setcaps (sink): %" GST_PTR_FORMAT, caps);
@@ -265,62 +266,61 @@ omx_setup (GstOmxBaseFilter *omx_base)
     }
 }
 
-static GstFlowReturn gst_omx_aacdec_pad_chain (GstPad *pad, GstBuffer *buf)
+static GstFlowReturn pad_chain (GstPad *pad,
+                                GstBuffer *buf)
 {
     GstOmxBaseFilter *omx_base;
     GstOmxAacDec *omx_aacdec;
     GstFlowReturn result = GST_FLOW_ERROR;
 
     omx_base = GST_OMX_BASE_FILTER (GST_PAD_PARENT (pad));
-    omx_aacdec = GST_OMX_AACDEC(gst_pad_get_parent (pad));
+    omx_aacdec = GST_OMX_AACDEC (gst_pad_get_parent (pad));
 
     GST_INFO_OBJECT (omx_aacdec, "Enter");
 
 #ifdef BUILD_WITH_ANDROID
-    /*
-     * put codec_data before the first frame to work with PV OpenMax in android
-     */
-    if(omx_aacdec->codec_data != NULL && buf != NULL)
+    /* put codec_data before the first frame to work with PV OpenMax in android */
+    if (omx_aacdec->codec_data && buf)
     {
         GstBuffer *newbuf = NULL;
-        int new_buf_size =
-            GST_BUFFER_SIZE(buf) + GST_BUFFER_SIZE(omx_aacdec->codec_data);
+        int new_buf_size = GST_BUFFER_SIZE (buf) +
+            GST_BUFFER_SIZE (omx_aacdec->codec_data);
 
         GST_INFO_OBJECT (omx_aacdec,
-            "Put codec_data before the first frame, buf_size=%d, codec_data_size=%d",
-            GST_BUFFER_SIZE(buf),
-            GST_BUFFER_SIZE(omx_aacdec->codec_data));
+                         "Put codec_data before the first frame, buf_size=%d, codec_data_size=%d",
+                         GST_BUFFER_SIZE (buf),
+                         GST_BUFFER_SIZE (omx_aacdec->codec_data));
 
         /* create a new buffer */
-        newbuf = gst_buffer_new_and_alloc(new_buf_size);
+        newbuf = gst_buffer_new_and_alloc (new_buf_size);
 
         /* copy meta data */
-        gst_buffer_copy_metadata(newbuf, buf,
-            GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS | GST_BUFFER_COPY_CAPS);
+        gst_buffer_copy_metadata (newbuf, buf,
+                                  GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS | GST_BUFFER_COPY_CAPS);
 
         /* copy codec data */
-        memcpy(GST_BUFFER_DATA(newbuf),
-            GST_BUFFER_DATA(omx_aacdec->codec_data), GST_BUFFER_SIZE(omx_aacdec->codec_data));
+        memcpy (GST_BUFFER_DATA (newbuf),
+                GST_BUFFER_DATA (omx_aacdec->codec_data),
+                GST_BUFFER_SIZE (omx_aacdec->codec_data));
 
         /* copy the first frame */
-        memcpy(
-            GST_BUFFER_DATA(newbuf)+GST_BUFFER_SIZE(omx_aacdec->codec_data),
-            GST_BUFFER_DATA(buf),
-            GST_BUFFER_SIZE(buf));
+        memcpy (GST_BUFFER_DATA (newbuf) + GST_BUFFER_SIZE (omx_aacdec->codec_data),
+                GST_BUFFER_DATA (buf),
+                GST_BUFFER_SIZE (buf));
 
         /* release buf and codec_data */
-        gst_buffer_unref(buf);
-        gst_buffer_unref(omx_aacdec->codec_data);
+        gst_buffer_unref (buf);
+        gst_buffer_unref (omx_aacdec->codec_data);
         omx_aacdec->codec_data = NULL;
 
         buf = newbuf;
     }
 #endif /* BUILD_WITH_ANDROID */
 
-    if( omx_aacdec->base_chain_func )
-        result = omx_aacdec->base_chain_func(pad, buf);
+    if (omx_aacdec->base_chain_func)
+        result = omx_aacdec->base_chain_func (pad, buf);
 
-    GST_INFO_OBJECT (omx_aacdec, "Leave, result=0x%08x", result);
+    GST_INFO_OBJECT (omx_aacdec, "end, result=0x%08x", result);
 
     return result;
 }
@@ -334,8 +334,8 @@ type_instance_init (GTypeInstance *instance,
     GstOmxAacDec *omx_aacdec;
 
     omx_base = GST_OMX_BASE_FILTER (instance);
-    omx_aacdec = GST_OMX_AACDEC(instance);
-    GST_INFO_OBJECT(omx_aacdec, "Enter");
+    omx_aacdec = GST_OMX_AACDEC (instance);
+    GST_INFO_OBJECT (omx_aacdec, "begin");
 
     omx_base->omx_component = g_strdup (OMX_COMPONENT_NAME);
     omx_base->omx_setup = omx_setup;
@@ -349,28 +349,27 @@ type_instance_init (GTypeInstance *instance,
     omx_aacdec->base_chain_func = NULL;
 
     /* replace base chain func */
-    omx_aacdec->base_chain_func = GST_PAD_CHAINFUNC(omx_base->sinkpad);
-    gst_pad_set_chain_function (omx_base->sinkpad, gst_omx_aacdec_pad_chain);
-    GST_INFO_OBJECT(omx_aacdec, "Leave");
+    omx_aacdec->base_chain_func = GST_PAD_CHAINFUNC (omx_base->sinkpad);
+    gst_pad_set_chain_function (omx_base->sinkpad, pad_chain);
+    GST_INFO_OBJECT (omx_aacdec, "end");
 }
 
 static void
-gst_omx_aacdec_dispose (GObject *obj)
+dispose (GObject *obj)
 {
     GstOmxAacDec *omx_aacdec;
 
-    GST_INFO_OBJECT (omx_aacdec, "Enter");
+    GST_INFO_OBJECT (omx_aacdec, "begin");
 
-    omx_aacdec = GST_OMX_AACDEC(obj);
+    omx_aacdec = GST_OMX_AACDEC (obj);
 
-    if(omx_aacdec->codec_data)
+    if (omx_aacdec->codec_data)
     {
-        gst_buffer_unref(omx_aacdec->codec_data);
+        gst_buffer_unref (omx_aacdec->codec_data);
         omx_aacdec->codec_data = NULL;
     }
     omx_aacdec->base_chain_func = NULL;
 }
-
 
 GType
 gst_omx_aacdec_get_type (void)
